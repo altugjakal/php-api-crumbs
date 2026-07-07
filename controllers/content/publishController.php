@@ -1,16 +1,11 @@
 <?php
 
-
 require_once './utils/DBConnector.php';
 require_once './utils/Response.php';
 require_once './controllers/AppController.php';
 
 class PublishController extends AppController
 {
-
-
-
-
     public function createPost()
     {
         $user = $_SESSION['user'];
@@ -18,18 +13,25 @@ class PublishController extends AppController
 
             $url = uniqid();
             $date = date("Y-m-d h:i");
-
-            $directory = $_SERVER["DOCUMENT_ROOT"] . "/images/";
+            $directory = __DIR__ . "/images/";
 
             if (isset($_FILES['conf'])) {
-                $newName = basename($url . '-' . $_FILES["conf"]["name"]);
+                $fileName = $_FILES["conf"]["name"];
+                $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+                $allowedExtensions = ['jpg', 'jpeg', 'png'];
+
+                if (!in_array($fileExtension, $allowedExtensions)) {
+                    $this->response->send('error', 'Invalid file type. Only JPG, JPEG, and PNG are allowed.');
+                    exit;
+                }
+
+                $newName = $url . '.' . $fileExtension;
                 $file = $directory . $newName;
+
                 if (move_uploaded_file($_FILES["conf"]["tmp_name"], $file)) {
                     $conf = $newName;
                 } else {
-                    $state = 'error';
-                    $message = 'File transfer failed.';
-                    $this->response->send($state, $message);
+                    $this->response->send('error', 'File transfer failed.');
                     exit;
                 }
             } else {
@@ -46,12 +48,8 @@ class PublishController extends AppController
                 $access = 'public';
             }
 
-
             $title = mysqli_real_escape_string($this->conn, $this->data['title']);
             $collect = mysqli_real_escape_string($this->conn, $this->data['collect']);
-
-
-
             $body = mysqli_real_escape_string($this->conn, $this->data['body']);
 
             if (!empty($this->data['parent'])) {
@@ -69,41 +67,31 @@ class PublishController extends AppController
                         } else {
                             $message = $user . ' replied to your post: ' . $parentBody;
                         }
-                        //createSystemMessage($this->conn, $parentName, $message);
-                        //create the system message by specifying format in sql with the format = object - type - date // current one sucks ass
                     }
                 } else {
                     $parent = 'public';
                 }
-
             } else {
                 $parent = 'public';
             }
 
             $sql = "INSERT INTO paths (name, title, parent, url, body, date, conf, collect, access) VALUES ('$user', '$title', '$parent', '$url', '$body', '$date', '$conf', '$collect', '$access')";
 
-            //addPoint($this->conn, $user, $postPoint); too lazy to write it, gotta make a class for it 
             if (mysqli_query($this->conn, $sql)) {
                 $message = 'Post created successfully.';
                 $state = 'success';
                 $this->response->send($state, $message, ['url' => $url]);
-
             } else {
                 $message = 'Error in creating post.';
                 $state = 'error';
                 $this->response->send($state, $message);
             }
-
-
         } else {
             $state = 'error';
             $message = 'Please fill in all fields.';
             $this->response->send($state, $message);
-
         }
-
     }
-
 
     public function createPin()
     {
@@ -128,9 +116,7 @@ class PublishController extends AppController
                         if (mysqli_query($this->conn, $sql)) {
                             $state = 'success';
                             $message = 'Pin created successfully.';
-
                             $this->response->send($state, $message, ['url' => $url]);
-
                         } else {
                             $state = 'error';
                             $message = 'Error in creating pin.';
@@ -153,12 +139,10 @@ class PublishController extends AppController
         }
     }
 
-
     public function createDiary()
     {
         if (!empty($this->data['message'])) {
             $user = $_SESSION['user'];
-            $amount = 1;
             $date = date("Y-m-d h:i");
             $message = mysqli_real_escape_string($this->conn, $this->data['message']);
             $sql = "DELETE FROM diary WHERE name='$user'";
@@ -168,11 +152,9 @@ class PublishController extends AppController
                     $state = 'success';
                     $message = 'Diary Updated';
                     $this->response->send($state, $message);
-                    //addPoint($this->conn, $user, $amount);
                 } else {
                     $state = 'error';
                     $message = 'Failed';
-
                     $this->response->send($state, $message);
                 }
             } else {
@@ -180,7 +162,6 @@ class PublishController extends AppController
                 $message = 'Failed';
                 $this->response->send($state, $message);
             }
-
         }
     }
 
@@ -188,7 +169,6 @@ class PublishController extends AppController
     {
         if (!empty($this->data['note']) && !empty($this->data['club'])) {
             $user = $_SESSION['user'];
-            $amount = 1;
             $date = date("Y-m-d h:i");
             $note = mysqli_real_escape_string($this->conn, $this->data['note']);
             $club = mysqli_real_escape_string($this->conn, $this->data['club']);
@@ -197,23 +177,16 @@ class PublishController extends AppController
                 $state = 'success';
                 $message = 'Note Sent';
                 $this->response->send($state, $message);
-                //addPoint($this->conn, $user, $amount);
             } else {
                 $state = 'error';
                 $message = 'Failed';
                 $this->response->send($state, $message);
             }
-
         }
     }
 
     public function createReaction()
     {
-
-
-
-
-
         if (!empty($this->data['value']) && !empty($this->data['url'])) {
             $user = $_SESSION['user'];
             $url = $this->data['url'];
@@ -233,18 +206,6 @@ class PublishController extends AppController
                 }
             }
         }
-
-
-
-
-
-
-
-
-
-
-
     }
-
 }
 ?>
