@@ -19,7 +19,7 @@ class ProfileController extends AppController
             $result = mysqli_query($this->conn, $sql);
             if ($result) {
                 $data = array();
-                while ($row = mysqli_fetch_array($result)) {
+                while ($row = mysqli_fetch_assoc($result)) {
                     $data[] = $row;
                 }
                 $state = 'success';
@@ -59,14 +59,25 @@ class ProfileController extends AppController
         }
 
         if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-            $directory = __DIR__ . "/profile-images/";
+            $directory = dirname(__DIR__, 2) . "/profile-images/";
             $fileName = $_FILES["photo"]["name"];
             $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
             $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
 
-            if (in_array($fileExtension, $allowedExtensions)) {
-                $newName = uniqid('profile_', true) . '.' . $fileExtension;
+            if (in_array($fileExtension, $allowedExtensions, true)) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mimeType = $finfo->file($_FILES["photo"]["tmp_name"]);
+                if (strpos($mimeType, 'text/php') !== false || strpos($mimeType, 'application/x-php') !== false) {
+                    $this->response->send('error', 'Invalid file content signature.');
+                    exit;
+                }
+
+                $newName = bin2hex(random_bytes(16)) . '.' . $fileExtension;
                 $file = $directory . $newName;
+
+                if (!is_dir($directory)) {
+                    mkdir($directory, 0755, true);
+                }
 
                 if (move_uploaded_file($_FILES["photo"]["tmp_name"], $file)) {
                     $updates[] = "photo = '$newName'";
