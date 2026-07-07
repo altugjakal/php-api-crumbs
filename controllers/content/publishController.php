@@ -12,8 +12,9 @@ class PublishController extends AppController
         if (isset($this->data['title']) && !empty($this->data['body']) && isset($this->data['collect']) && !empty($user)) {
 
             $url = uniqid();
-            $date = date("Y-m-d h:i");
-            $directory = __DIR__ . "/images/";
+            $date = date("Y-m-d H:i");
+            // Fixed: Stepping out of subfolders to hit root /images/ folder
+            $directory = dirname(__DIR__, 2) . "/images/";
 
             if (isset($_FILES['conf'])) {
                 $fileName = $_FILES["conf"]["name"];
@@ -48,6 +49,7 @@ class PublishController extends AppController
                 $access = 'public';
             }
 
+            $userEscaped = mysqli_real_escape_string($this->conn, $user);
             $title = mysqli_real_escape_string($this->conn, $this->data['title']);
             $collect = mysqli_real_escape_string($this->conn, $this->data['collect']);
             $body = mysqli_real_escape_string($this->conn, $this->data['body']);
@@ -56,9 +58,9 @@ class PublishController extends AppController
                 $parent = mysqli_real_escape_string($this->conn, $this->data['parent']);
                 $sql = "SELECT name, body, title FROM paths WHERE url='$parent'";
                 $result = mysqli_query($this->conn, $sql);
-                if (mysqli_num_rows($result) === 1) {
+                if ($result && mysqli_num_rows($result) === 1) {
                     $row = mysqli_fetch_assoc($result);
-                    $parentName = mysqli_real_escape_string($this->conn, $row['name']);
+                    $parentName = $row['name'];
                     $parentTitle = mysqli_real_escape_string($this->conn, $row['title']);
                     $parentBody = mysqli_real_escape_string($this->conn, $row['body']);
                     if ($parentName !== $user) {
@@ -75,7 +77,7 @@ class PublishController extends AppController
                 $parent = 'public';
             }
 
-            $sql = "INSERT INTO paths (name, title, parent, url, body, date, conf, collect, access) VALUES ('$user', '$title', '$parent', '$url', '$body', '$date', '$conf', '$collect', '$access')";
+            $sql = "INSERT INTO paths (name, title, parent, url, body, date, conf, collect, access) VALUES ('$userEscaped', '$title', '$parent', '$url', '$body', '$date', " . ($conf ? "'$conf'" : "NULL") . ", '$collect', '$access')";
 
             if (mysqli_query($this->conn, $sql)) {
                 $message = 'Post created successfully.';
@@ -96,13 +98,15 @@ class PublishController extends AppController
     public function createPin()
     {
         $user = $_SESSION['user'];
-        $date = date("Y-m-d h:i");
-        if (!empty($this->data['url']) && !empty($this->data['club']) && !empty($this->data['category']) && !empty($_SESSION['user'])) {
+        $date = date("Y-m-d H:i");
+        if (!empty($this->data['url']) && !empty($this->data['club']) && !empty($this->data['category']) && !empty($user)) {
             if ($this->data['type'] === 'post') {
                 $club = mysqli_real_escape_string($this->conn, $this->data['club']);
                 $type = mysqli_real_escape_string($this->conn, $this->data['type']);
                 $url = mysqli_real_escape_string($this->conn, $this->data['url']);
-                $sql = "SELECT * FROM club_user WHERE club='$club' AND user='$user'";
+                $userEscaped = mysqli_real_escape_string($this->conn, $user);
+                
+                $sql = "SELECT * FROM club_user WHERE club='$club' AND user='$userEscaped'";
                 $result = mysqli_query($this->conn, $sql);
 
                 if (isset($this->data['quote'])) {
@@ -110,9 +114,10 @@ class PublishController extends AppController
                 } else {
                     $quote = null;
                 }
+                
                 if ($result) {
                     if (mysqli_num_rows($result) === 1) {
-                        $sql = "INSERT INTO pins (name, quote, type, url, club, date) VALUES ('$user', '$quote', '$type', '$url', '$club', '$date')";
+                        $sql = "INSERT INTO pins (name, quote, type, url, club, date) VALUES ('$userEscaped', " . ($quote ? "'$quote'" : "NULL") . ", '$type', '$url', '$club', '$date')";
                         if (mysqli_query($this->conn, $sql)) {
                             $state = 'success';
                             $message = 'Pin created successfully.';
@@ -143,11 +148,13 @@ class PublishController extends AppController
     {
         if (!empty($this->data['message'])) {
             $user = $_SESSION['user'];
-            $date = date("Y-m-d h:i");
+            $userEscaped = mysqli_real_escape_string($this->conn, $user);
+            $date = date("Y-m-d H:i");
             $message = mysqli_real_escape_string($this->conn, $this->data['message']);
-            $sql = "DELETE FROM diary WHERE name='$user'";
+            
+            $sql = "DELETE FROM diary WHERE name='$userEscaped'";
             if (mysqli_query($this->conn, $sql)) {
-                $sql = "INSERT INTO diary (name, message, date) VALUES ('$user', '$message', '$date')";
+                $sql = "INSERT INTO diary (name, message, date) VALUES ('$userEscaped', '$message', '$date')";
                 if (mysqli_query($this->conn, $sql)) {
                     $state = 'success';
                     $message = 'Diary Updated';
@@ -169,10 +176,12 @@ class PublishController extends AppController
     {
         if (!empty($this->data['note']) && !empty($this->data['club'])) {
             $user = $_SESSION['user'];
-            $date = date("Y-m-d h:i");
+            $userEscaped = mysqli_real_escape_string($this->conn, $user);
+            $date = date("Y-m-d H:i");
             $note = mysqli_real_escape_string($this->conn, $this->data['note']);
             $club = mysqli_real_escape_string($this->conn, $this->data['club']);
-            $sql = "INSERT INTO gossip (name, note, club, date) VALUES ('$user', '$note', '$club', '$date')";
+            
+            $sql = "INSERT INTO gossip (name, note, club, date) VALUES ('$userEscaped', '$note', '$club', '$date')";
             if (mysqli_query($this->conn, $sql)) {
                 $state = 'success';
                 $message = 'Note Sent';
@@ -189,12 +198,14 @@ class PublishController extends AppController
     {
         if (!empty($this->data['value']) && !empty($this->data['url'])) {
             $user = $_SESSION['user'];
-            $url = $this->data['url'];
-            $date = date("Y-m-d h:i");
+            $userEscaped = mysqli_real_escape_string($this->conn, $user);
+            $url = mysqli_real_escape_string($this->conn, $this->data['url']);
+            $date = date("Y-m-d H:i");
             $rating = mysqli_real_escape_string($this->conn, $this->data['value']);
-            $sql = "DELETE FROM reaction WHERE name='$user' AND url='$url'";
+            
+            $sql = "DELETE FROM reaction WHERE name='$userEscaped' AND url='$url'";
             if (mysqli_query($this->conn, $sql)) {
-                $sql = "INSERT IGNORE INTO reaction (name, rating, url, date) VALUES ('$user', '$rating', '$url', '$date')";
+                $sql = "INSERT IGNORE INTO reaction (name, rating, url, date) VALUES ('$userEscaped', '$rating', '$url', '$date')";
                 if (mysqli_query($this->conn, $sql)) {
                     $state = 'success';
                     $message = 'Reaction sent';
